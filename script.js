@@ -1,17 +1,19 @@
 (() => {
+  'use strict';
   const C = document.getElementById('game');
   const X = C.getContext('2d');
+
+  // UI
   const start = document.getElementById('start');
   const over  = document.getElementById('gameover');
   const btnPlay  = document.getElementById('play');
   const btnRetry = document.getElementById('retry');
   const btnShare = document.getElementById('share');
-  const uiScore = document.getElementById('score');
-  const uiBest  = document.getElementById('best');
-  const uiFinal = document.getElementById('finalScore');
+  const uiScore  = document.getElementById('score');
+  const uiBest   = document.getElementById('best');
+  const uiFinal  = document.getElementById('finalScore');
 
-  const W = C.width, H = C.height;
-  const cx = W/2, cy = H/2;
+  const W = C.width, H = C.height, cx = W/2, cy = H/2;
 
   // État
   let running = false, last = 0, dt = 0;
@@ -20,13 +22,20 @@
 
   // Paramètres
   const innerR = 90, outerR = 150;
-  let targetR = outerR, r = outerR;     // rayon d’orbite courant
-  let a = -Math.PI/2;                    // angle
-  const satSpeed = 1.8;                  // rad/s
-  const interp = 12;                     // vitesse d’interpolation du rayon
-  const rings = [];                      // anneaux (collectibles)
-  const meteors = [];                    // météores (dangers)
+  let targetR = outerR, r = outerR;
+  let a = -Math.PI/2;
+  const satSpeed = 1.8;
+  const interp = 12;
+  const rings = [];
+  const meteors = [];
   let spawnTimer = 0, ringTimer = 0;
+
+  // --- Sécurité : forcer l’état UI au démarrage
+  function forceInitialUI() {
+    start.hidden = false;
+    over.hidden  = true;
+    running = false;
+  }
 
   function reset(){
     score = 0; uiScore.textContent = '0';
@@ -36,20 +45,20 @@
   }
 
   function tap(){
-    if(!running) return;
+    if (!running) return;
     targetR = (targetR === outerR ? innerR : outerR);
   }
 
-  // Contrôles
+  // Input
   C.addEventListener('pointerdown', tap);
-  window.addEventListener('keydown', e => { if(e.code === 'Space') tap(); });
+  window.addEventListener('keydown', e => { if (e.code === 'Space') tap(); });
 
   // Spawns
   function spawnMeteor(){
     const ang = Math.random()*Math.PI*2;
     const speed = 80 + Math.random()*60 + Math.min(120, score*0.2);
-    const x = cx + Math.cos(ang)* (Math.max(W,H));
-    const y = cy + Math.sin(ang)* (Math.max(W,H));
+    const x = cx + Math.cos(ang)*Math.max(W,H);
+    const y = cy + Math.sin(ang)*Math.max(W,H);
     const vx = cx - x, vy = cy - y;
     const len = Math.hypot(vx,vy);
     meteors.push({x,y, vx:vx/len*speed, vy:vy/len*speed, rad:8+Math.random()*8, life:8});
@@ -63,23 +72,19 @@
   // Rendu
   function drawSpace(){
     X.clearRect(0,0,W,H);
-    // planète
     X.fillStyle = getCSS('--planet');
     X.beginPath(); X.arc(cx,cy,60,0,Math.PI*2); X.fill();
-    // anneaux d’orbites
     X.strokeStyle = getCSS('--ring'); X.lineWidth = 2.5; X.globalAlpha = 0.7;
-    circle(cx,cy,innerR); circle(cx,cy,outerR);
-    X.globalAlpha = 1;
+    circle(cx,cy,innerR); circle(cx,cy,outerR); X.globalAlpha = 1;
   }
   function circle(x,y,R){ X.beginPath(); X.arc(x,y,R,0,Math.PI*2); X.stroke(); }
   function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name); }
 
   // Boucle
   function update(now){
-    dt = (now-last)/1000; if(dt>0.033) dt = 0.033; last = now;
-    if(!running) return; // stop propre de la boucle
+    dt = (now-last)/1000; if (dt>0.033) dt = 0.033; last = now;
+    if (!running) return;
 
-    // Score
     score += dt*10; uiScore.textContent = Math.floor(score);
 
     // Satellite
@@ -90,36 +95,35 @@
 
     // Spawns
     spawnTimer -= dt; ringTimer -= dt;
-    if(spawnTimer<=0){ spawnMeteor(); spawnTimer = 0.6 + Math.max(0.15, 1.1 - score*0.01); }
-    if(ringTimer<=0){ spawnRing();   ringTimer  = 2.2 + Math.max(0.00, 1.2 - score*0.01); }
+    if (spawnTimer<=0){ spawnMeteor(); spawnTimer = 0.6 + Math.max(0.15, 1.1 - score*0.01); }
+    if (ringTimer<=0){ spawnRing();   ringTimer  = 2.2 + Math.max(0.00, 1.2 - score*0.01); }
 
-    // Météores
-    for(let i=meteors.length-1;i>=0;i--){
+    // Meteors
+    for (let i=meteors.length-1;i>=0;i--){
       const m = meteors[i];
       m.x += m.vx*dt; m.y += m.vy*dt; m.life -= dt;
       if (Math.hypot(m.x - sx, m.y - sy) < m.rad + 6){ gameOver(); return; }
       if (m.life<=0 || m.x<-50 || m.x>W+50 || m.y<-50 || m.y>H+50) meteors.splice(i,1);
     }
 
-    // Anneaux
-    for(let i=rings.length-1;i>=0;i--){
+    // Rings
+    for (let i=rings.length-1;i>=0;i--){
       const g = rings[i];
       const gx = cx + Math.cos(g.ang)*g.R;
       const gy = cy + Math.sin(g.ang)*g.R;
       g.blink += dt;
-      if(Math.hypot(gx-sx, gy-sy) < 12){
+      if (Math.hypot(gx-sx, gy-sy) < 12){
         rings.splice(i,1);
         score += 25; uiScore.textContent = Math.floor(score);
       }
-      if(g.blink>6) rings.splice(i,1);
+      if (g.blink>6) rings.splice(i,1);
     }
 
     // Rendu
     drawSpace();
-
-    // Anneaux (visuels)
+    // Rings
     X.save();
-    for(const g of rings){
+    for (const g of rings){
       const alpha = 0.6 + 0.4*Math.sin(g.blink*6);
       X.strokeStyle = getCSS('--ring'); X.globalAlpha = alpha; circle(cx,cy,g.R);
       const gx = cx + Math.cos(g.ang)*g.R;
@@ -127,12 +131,8 @@
       X.globalAlpha = 1; X.beginPath(); X.arc(gx,gy,6,0,Math.PI*2); X.fillStyle = getCSS('--ring'); X.fill();
     }
     X.restore();
-
-    // Météores
-    for(const m of meteors){
-      X.fillStyle = getCSS('--meteor'); X.beginPath(); X.arc(m.x,m.y,m.rad,0,Math.PI*2); X.fill();
-    }
-
+    // Meteors
+    for (const m of meteors){ X.fillStyle = getCSS('--meteor'); X.beginPath(); X.arc(m.x,m.y,m.rad,0,Math.PI*2); X.fill(); }
     // Satellite + traînée
     X.fillStyle = getCSS('--sat'); X.beginPath(); X.arc(sx,sy,6,0,Math.PI*2); X.fill();
     X.globalAlpha=0.25; X.beginPath(); X.arc(cx,cy,r, a-0.8, a); X.strokeStyle=getCSS('--sat'); X.lineWidth=2; X.stroke(); X.globalAlpha=1;
@@ -143,7 +143,8 @@
   function startGame(){
     reset();
     running = true;
-    start.hidden = true; over.hidden = true;
+    start.hidden = true;
+    over.hidden  = true;
     requestAnimationFrame(ts => { last = ts; update(ts); });
   }
 
@@ -151,11 +152,11 @@
     running = false;
     const final = Math.floor(score);
     uiFinal.textContent = final;
-    if(final > best){ best = final; localStorage.setItem('orbit_best', String(best)); uiBest.textContent = best; }
+    if (final > best){ best = final; localStorage.setItem('orbit_best', String(best)); uiBest.textContent = best; }
     over.hidden = false;
   }
 
-  // Boutons (IDs corrects)
+  // Boutons corrects
   btnPlay.addEventListener('click', startGame);
   btnRetry.addEventListener('click', startGame);
   btnShare.addEventListener('click', () => {
@@ -166,6 +167,9 @@
     window.open(u.toString(), '_blank');
   });
 
-  // Dessine le fond au chargement
-  drawSpace();
+  // Forcer l’état initial au chargement
+  window.addEventListener('DOMContentLoaded', () => {
+    forceInitialUI();
+    drawSpace(); // fond visible avant de jouer
+  });
 })();
