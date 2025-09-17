@@ -204,3 +204,15 @@
   // Draw static background before start
   drawSpace();
 })();
+// --- Boutons Jouer / Rejouer ---
+document.getElementById("startBtn").onclick = () => {
+  reset();
+  running = true;
+  requestAnimationFrame(loop);
+};
+
+document.getElementById("restartBtn").onclick = () => {
+  reset();
+  running = true;
+  requestAnimationFrame(loop);
+};
