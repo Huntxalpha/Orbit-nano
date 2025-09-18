@@ -13,13 +13,14 @@
   const uiScore = document.getElementById('score');
   const uiBest  = document.getElementById('best');
   const uiFinal = document.getElementById('finalScore');
+  const uiRings = document.getElementById('rings');
 
   const W = C.width, H = C.height, cx = W/2, cy = H/2;
 
   // État
   let running = false, last = 0, dt = 0;
-  let score = 0, best = parseInt(localStorage.getItem('orbit_best')||'0');
-  uiBest.textContent = best;
+  let score = 0, ringsCount = 0;
+  let best = parseInt(localStorage.getItem('orbit_best')||'0'); uiBest.textContent = best;
 
   // Paramètres
   const innerR = 90, outerR = 150;
@@ -30,7 +31,7 @@
   const rings = [];
   const meteors = [];
   let spawnTimer = 0, ringTimer = 0;
-  let tutorial = 0; // hint au début
+  let tutorial = 0; // hint de départ
 
   function forceInitialUI(){
     start.hidden = false;
@@ -39,19 +40,16 @@
   }
 
   function reset(){
-    score = 0; uiScore.textContent = '0';
+    score = 0; ringsCount = 0; uiScore.textContent = '0'; uiRings.textContent = '0';
     a = -Math.PI/2; r = outerR; targetR = outerR;
     rings.length = 0; meteors.length = 0;
-    tutorial   = 2.0;    // affiche "Tape pour changer d’orbite" 2 s
-    spawnTimer = 0.30;   // premier météore très vite
-    ringTimer  = 0.50;   // premier anneau très vite
+    tutorial   = 1.8;    // “Tape pour changer d’orbite” ~2 s
+    spawnTimer = 0.30;   // 1er météore très vite
+    ringTimer  = 0.50;   // 1er anneau très vite
     last = performance.now(); dt = 0;
   }
 
-  function tap(){
-    if (!running) return;
-    targetR = (targetR === outerR ? innerR : outerR);
-  }
+  function tap(){ if (running) targetR = (targetR === outerR ? innerR : outerR); }
 
   // Input
   C.addEventListener('pointerdown', tap);
@@ -69,7 +67,7 @@
       x, y,
       vx: vx/len*speed,
       vy: vy/len*speed,
-      rad: 10 + Math.random()*10,
+      rad: 12 + Math.random()*10, // plus gros
       life: 8
     });
   }
@@ -107,14 +105,14 @@
 
     // Spawns
     spawnTimer -= dt; ringTimer -= dt;
-    if (spawnTimer<=0){ spawnMeteor(); spawnTimer = 0.6 + Math.max(0.15, 1.1 - score*0.01); }
-    if (ringTimer<=0){ spawnRing();   ringTimer  = 2.2 + Math.max(0.00, 1.2 - score*0.01); }
+    if (spawnTimer<=0){ spawnMeteor(); spawnTimer = 0.55 + Math.max(0.12, 1.0 - score*0.01); }
+    if (ringTimer<=0){ spawnRing();   ringTimer  = 2.0  + Math.max(0.00, 1.1 - score*0.01); }
 
     // Météores
     for (let i=meteors.length-1;i>=0;i--){
       const m = meteors[i];
       m.x += m.vx*dt; m.y += m.vy*dt; m.life -= dt;
-      if (Math.hypot(m.x - sx, m.y - sy) < m.rad + 6){ return gameOver(); }
+      if (Math.hypot(m.x - sx, m.y - sy) < m.rad + 6) return gameOver();
       if (m.life<=0 || m.x<-50 || m.x>W+50 || m.y<-50 || m.y>H+50) meteors.splice(i,1);
     }
 
@@ -126,6 +124,7 @@
       g.blink += dt;
       if (Math.hypot(gx-sx, gy-sy) < 12){
         rings.splice(i,1);
+        ringsCount++; uiRings.textContent = ringsCount;
         score += 25; uiScore.textContent = Math.floor(score);
       }
       if (g.blink>6) rings.splice(i,1);
@@ -145,14 +144,21 @@
     }
     X.restore();
 
-    // Météores
+    // Météores (avec halo visuel)
+    X.save();
     for (const m of meteors){
-      X.fillStyle = getCSS('--meteor'); X.beginPath(); X.arc(m.x,m.y,m.rad,0,Math.PI*2); X.fill();
+      // halo simple : couleur + cercle
+      X.shadowColor = 'rgba(255,90,90,.8)';
+      X.shadowBlur = 10;
+      X.fillStyle = getCSS('--meteor');
+      X.beginPath(); X.arc(m.x,m.y,m.rad,0,Math.PI*2); X.fill();
     }
+    X.restore();
 
     // Satellite + traînée
     X.fillStyle = getCSS('--sat'); X.beginPath(); X.arc(sx,sy,6,0,Math.PI*2); X.fill();
-    X.globalAlpha=0.25; X.beginPath(); X.arc(cx,cy,r, a-0.8, a); X.strokeStyle=getCSS('--sat'); X.lineWidth=2; X.stroke(); X.globalAlpha=1;
+    X.globalAlpha=0.25; X.beginPath(); X.arc(cx,cy,r, a-0.8, a); X.strokeStyle=getCSS('--sat'); X.lineWidth=2; X.stroke();
+    X.globalAlpha=1;
 
     // Hint visuel au début
     if (tutorial > 0) {
