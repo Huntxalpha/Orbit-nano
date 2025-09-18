@@ -35,32 +35,15 @@ canvas#game{
   backdrop-filter: blur(4px);
   border-radius:16px; z-index:4; padding:16px;
 }
+/* cacher vraiment quand hidden est présent */
+.overlay[hidden]{ display:none !important; }
 
-/* Cacher vraiment les overlays quand hidden est présent */
-.overlay[hidden] {
-  display: none !important;
+.overlay h1{letter-spacing:2px;margin:0;font-size:28px}
+.overlay h2{margin:0 0 8px 0}
+.overlay p{opacity:.9;margin:0 0 8px 0}
+button{
+  appearance:none; border:0; background:var(--ring); color:#001320;
+  border-radius:999px; padding:10px 16px; font-weight:700; cursor:pointer
 }
-
-.overlay h1 {letter-spacing:2px; margin:0; font-size:28px}
-.overlay h2 {margin:0 0 8px 0}
-.overlay p  {opacity:.9; margin:0 0 8px 0}
-
-button {
-  appearance:none;
-  border:0;
-  background:var(--ring);
-  color:#001320;
-  border-radius:999px;
-  padding:10px 16px;
-  font-weight:700;
-  cursor:pointer;
-}
-
-button:hover {
-  filter:brightness(1.03);
-}
-
-.row {
-  display:flex;
-  gap:10px;
-}
+button:hover{filter:brightness(1.03)}
+.row{display:flex; gap:10px}
