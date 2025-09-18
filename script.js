@@ -5,14 +5,14 @@
   const X = C.getContext('2d');
 
   // UI
-  const start = document.getElementById('start');
-  const over  = document.getElementById('gameover');
-  const btnPlay  = document.getElementById('play');
-  const btnRetry = document.getElementById('retry');
-  const btnShare = document.getElementById('share');
-  const uiScore  = document.getElementById('score');
-  const uiBest   = document.getElementById('best');
-  const uiFinal  = document.getElementById('finalScore');
+  const start   = document.getElementById('start');
+  const over    = document.getElementById('gameover');
+  const btnPlay = document.getElementById('play');
+  const btnRetry= document.getElementById('retry');
+  const btnShare= document.getElementById('share');
+  const uiScore = document.getElementById('score');
+  const uiBest  = document.getElementById('best');
+  const uiFinal = document.getElementById('finalScore');
 
   const W = C.width, H = C.height, cx = W/2, cy = H/2;
 
@@ -30,8 +30,8 @@
   const rings = [];
   const meteors = [];
   let spawnTimer = 0, ringTimer = 0;
+  let tutorial = 0; // hint au début
 
-  // Force un état propre au chargement
   function forceInitialUI(){
     start.hidden = false;
     over.hidden  = true;
@@ -42,9 +42,9 @@
     score = 0; uiScore.textContent = '0';
     a = -Math.PI/2; r = outerR; targetR = outerR;
     rings.length = 0; meteors.length = 0;
-    // IMPORTANT : pas de météore pendant 1s pour éviter toute collision instantanée
-    spawnTimer = 1.0; 
-    ringTimer  = 1.0;
+    tutorial   = 2.0;    // affiche "Tape pour changer d’orbite" 2 s
+    spawnTimer = 0.30;   // premier météore très vite
+    ringTimer  = 0.50;   // premier anneau très vite
     last = performance.now(); dt = 0;
   }
 
@@ -60,12 +60,18 @@
   // Spawns
   function spawnMeteor(){
     const ang = Math.random()*Math.PI*2;
-    const speed = 80 + Math.random()*60 + Math.min(120, score*0.2);
+    const speed = 120 + Math.random()*60 + Math.min(160, score*0.25);
     const x = cx + Math.cos(ang)*Math.max(W,H);
     const y = cy + Math.sin(ang)*Math.max(W,H);
     const vx = cx - x, vy = cy - y;
     const len = Math.hypot(vx,vy);
-    meteors.push({x,y, vx:vx/len*speed, vy:vy/len*speed, rad:8+Math.random()*8, life:8});
+    meteors.push({
+      x, y,
+      vx: vx/len*speed,
+      vy: vy/len*speed,
+      rad: 10 + Math.random()*10,
+      life: 8
+    });
   }
   function spawnRing(){
     const ringOrbit = (targetR===outerR? innerR : outerR);
@@ -76,11 +82,12 @@
   // Rendu
   function drawSpace(){
     X.clearRect(0,0,W,H);
+    // planète
     X.fillStyle = getCSS('--planet');
     X.beginPath(); X.arc(cx,cy,60,0,Math.PI*2); X.fill();
+    // orbites
     X.strokeStyle = getCSS('--ring'); X.lineWidth = 2.5; X.globalAlpha = 0.7;
-    circle(cx,cy,innerR); circle(cx,cy,outerR);
-    X.globalAlpha = 1;
+    circle(cx,cy,innerR); circle(cx,cy,outerR); X.globalAlpha = 1;
   }
   function circle(x,y,R){ X.beginPath(); X.arc(x,y,R,0,Math.PI*2); X.stroke(); }
   function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name); }
@@ -127,14 +134,14 @@
     // Rendu
     drawSpace();
 
-    // Anneaux
+    // Anneaux visuels
     X.save();
     for (const g of rings){
       const alpha = 0.6 + 0.4*Math.sin(g.blink*6);
       X.strokeStyle = getCSS('--ring'); X.globalAlpha = alpha; circle(cx,cy,g.R);
       const gx = cx + Math.cos(g.ang)*g.R;
       const gy = cy + Math.sin(g.ang)*g.R;
-      X.globalAlpha = 1; X.beginPath(); X.arc(gx,gy,6,0,Math.PI*2); X.fillStyle = getCSS('--ring'); X.fill();
+      X.globalAlpha = 1; X.beginPath(); X.arc(gx,gy,8,0,Math.PI*2); X.fillStyle = getCSS('--ring'); X.fill();
     }
     X.restore();
 
@@ -145,8 +152,19 @@
 
     // Satellite + traînée
     X.fillStyle = getCSS('--sat'); X.beginPath(); X.arc(sx,sy,6,0,Math.PI*2); X.fill();
-    X.globalAlpha=0.25; X.beginPath(); X.arc(cx,cy,r, a-0.8, a); X.strokeStyle=getCSS('--sat'); X.lineWidth=2; X.stroke();
-    X.globalAlpha=1;
+    X.globalAlpha=0.25; X.beginPath(); X.arc(cx,cy,r, a-0.8, a); X.strokeStyle=getCSS('--sat'); X.lineWidth=2; X.stroke(); X.globalAlpha=1;
+
+    // Hint visuel au début
+    if (tutorial > 0) {
+      tutorial -= dt;
+      X.save();
+      X.globalAlpha = Math.max(0, Math.min(1, tutorial / 2));
+      X.fillStyle = '#fff';
+      X.font = 'bold 16px system-ui,Segoe UI,Roboto,Arial';
+      X.textAlign = 'center';
+      X.fillText('Tape pour changer d’orbite', cx, H - 40);
+      X.restore();
+    }
 
     requestAnimationFrame(update);
   }
@@ -167,7 +185,7 @@
     over.hidden = false;
   }
 
-  // Boutons (IDs corrects)
+  // Boutons
   btnPlay.addEventListener('click', startGame);
   btnRetry.addEventListener('click', startGame);
   btnShare.addEventListener('click', () => {
