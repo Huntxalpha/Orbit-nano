@@ -20,19 +20,27 @@
   <div id="game-root">
     <header id="hud">
       <div><strong>Score</strong> <span id="score">0</span></div>
+      <div><strong>Anneaux</strong> <span id="rings">0</span></div>
       <div><strong>Record</strong> <span id="best">0</span></div>
     </header>
 
     <canvas id="game" width="320" height="560" aria-label="Orbit Nano"></canvas>
 
+    <!-- Panneau objectif toujours visible en jeu -->
+    <div id="goal">
+      <strong>Objectif :</strong> Survivre et <em>collecter des anneaux</em>.  
+      <span class="warn">Collision avec un météore = perdu</span>.
+      <div class="tip">Tape/cliquer pour changer d’orbite (intérieure/extérieur).</div>
+    </div>
+
     <!-- Écran de départ -->
     <section id="start" class="overlay">
       <h1>ORBIT NANO</h1>
-      <p>Tape pour changer d’orbite. Évite les météores, collecte les anneaux.</p>
+      <p>Évite les météores, collecte des anneaux pour des +25 pts.</p>
       <button id="play">Jouer</button>
     </section>
 
-    <!-- Écran de fin (caché au départ) -->
+    <!-- Écran de fin -->
     <section id="gameover" class="overlay" hidden>
       <h2>Terminé</h2>
       <p>Score : <span id="finalScore">0</span></p>
@@ -40,9 +48,9 @@
         <button id="retry">Rejouer</button>
         <button id="share">Partager</button>
       </div>
+      <p class="small">Astuce : alterne les orbites pour éviter les météores.</p>
     </section>
   </div>
 
   <script src="script.js"></script>
 </body>
-</html>
