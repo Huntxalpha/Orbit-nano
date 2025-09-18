@@ -15,80 +15,82 @@
   const uiScore = document.getElementById('score');
   const uiBest  = document.getElementById('best');
   const uiFinal = document.getElementById('finalScore');
-  const uiRings = document.getElementById('rings'); // présent si tu as ajouté le compteur
 
   // État
   let running = false, last = 0, dt = 0;
-  let score = 0, ringsCount = 0;
-  let best = parseInt(localStorage.getItem('orbit_best')||'0'); uiBest.textContent = best;
+  let score = 0, best = parseInt(localStorage.getItem('orbit_best')||'0'); uiBest.textContent = best;
 
   // Paramètres orbitaux
   const innerR = 90, outerR = 150;
   let targetR = outerR, r = outerR;
-  let a = -Math.PI/2;
-  const satSpeed = 1.8;
-  const interp = 12;
+  let a = -Math.PI/2;               // angle du satellite
+  const satSpeed = 1.8;             // rad/s
+  const interp   = 12;              // vitesse d’interpolation du rayon
 
-  // Entités
-  const rings = [];
-  const meteors = [];
-  let spawnTimer = 0, ringTimer = 0;
-  let tutorial = 0; // hint “Tape pour changer d’orbite”
+  // Entités : anneaux (bonus) et pics (danger)
+  const rings = [];                 // {ang, R, blink}
+  const spikes = [];                // {R, ang, arc, t, life, phase}
+  let ringTimer  = 0;
+  let spikeTimer = 0;
+  let tutorial = 0;
 
-  // Utilitaires dessin
+  // Utils
   function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name); }
   function circle(x,y,R){ X.beginPath(); X.arc(x,y,R,0,Math.PI*2); X.stroke(); }
+  function normAngle(x){ while(x<=-Math.PI) x+=2*Math.PI; while(x>Math.PI) x-=2*Math.PI; return x; }
+  function angDist(a1,a2){ return Math.abs(normAngle(a1 - a2)); }
 
   // Fond
   function drawSpace(){
     X.clearRect(0,0,W,H);
+    // planète
     X.fillStyle = getCSS('--planet');
     X.beginPath(); X.arc(cx,cy,60,0,Math.PI*2); X.fill();
+    // orbites
     X.strokeStyle = getCSS('--ring'); X.lineWidth = 2.5; X.globalAlpha = 0.7;
-    circle(cx,cy,innerR); circle(cx,cy,outerR); X.globalAlpha = 1;
+    circle(cx,cy,innerR); circle(cx,cy,outerR);
+    X.globalAlpha = 1;
   }
 
-  // Spawns déterministes et visibles
-  function spawnMeteor(){
-    const ang = Math.random()*Math.PI*2;
-    const speed = 130 + Math.random()*70 + Math.min(180, score*0.25);
-    const x = cx + Math.cos(ang)*Math.max(W,H);
-    const y = cy + Math.sin(ang)*Math.max(W,H);
-    const vx = cx - x, vy = cy - y;
-    const len = Math.hypot(vx,vy);
-    meteors.push({
-      x, y,
-      vx: vx/len*speed,
-      vy: vy/len*speed,
-      rad: 14 + Math.random()*10,  // bien visible
-      life: 8
-    });
-  }
+  // Spawns
   function spawnRing(){
     const ringOrbit = (targetR===outerR? innerR : outerR);
     const ang = Math.random()*Math.PI*2;
     rings.push({ang, R:ringOrbit, blink:0});
   }
 
-  // Contrôles
-  function tap(){ if (running) targetR = (targetR === outerR ? innerR : outerR); }
+  // Pic = petit arc rouge sur une orbite (inner ou outer)
+  function spawnSpike(){
+    const R = (Math.random()<0.5? innerR : outerR);
+    const arc = (Math.random()*0.35 + 0.20);  // longueur d’arc (rad)
+    const ang = Math.random()*Math.PI*2;
+    const life = 2.0 + Math.random()*2.0;     // durée de vie
+    spikes.push({
+      R, ang, arc,
+      t: 0, life,
+      phase: Math.random()*Math.PI*2        // pour l’effet de pulsation
+    });
+  }
+
+  // Contrôle
+  function tap(){ if (running) targetR = (targetR===outerR? innerR : outerR); }
   C.addEventListener('pointerdown', tap);
-  window.addEventListener('keydown', e => { if (e.code === 'Space') tap(); });
+  window.addEventListener('keydown', e => { if(e.code==='Space') tap(); });
 
   // Reset / Start / Over
   function reset(){
-    score = 0; ringsCount = 0;
-    uiScore.textContent = '0';
-    if (uiRings) uiRings.textContent = '0';
+    score = 0; uiScore.textContent = '0';
     a = -Math.PI/2; r = outerR; targetR = outerR;
-    rings.length = 0; meteors.length = 0;
+    rings.length = 0; spikes.length = 0;
 
-    tutorial   = 2.0;   // hint 2 s
-    spawnTimer = 0.20;  // 1er météore à 0,2 s
-    ringTimer  = 0.50;  // 1er anneau à 0,5 s
+    // Démarrage clair
+    tutorial   = 1.8;   // hint ~2s
+    ringTimer  = 0.50;  // 1er anneau rapide
+    spikeTimer = 0.35;  // 1er pic rapide
 
     last = performance.now(); dt = 0;
   }
+
   function startGame(){
     reset();
     running = true;
@@ -96,56 +98,54 @@
     over.hidden  = true;
     requestAnimationFrame(ts => { last = ts; update(ts); });
   }
+
   function gameOver(){
     running = false;
     const final = Math.floor(score);
     uiFinal.textContent = final;
-    if (final > best){ best = final; localStorage.setItem('orbit_best', String(best)); uiBest.textContent = best; }
+    if(final > best){ best = final; localStorage.setItem('orbit_best', String(best)); uiBest.textContent = best; }
     over.hidden = false;
   }
 
   // Boucle
   function update(now){
-    dt = (now-last)/1000; if (dt>0.033) dt = 0.033; last = now;
-    if (!running) return;
+    dt = (now-last)/1000; if(dt>0.033) dt=0.033; last=now;
+    if(!running) return;
 
     score += dt*10; uiScore.textContent = Math.floor(score);
 
-    // Position satellite
+    // Déplacement satellite
     a += satSpeed * dt;
     r += (targetR - r) * Math.min(1, interp*dt);
     const sx = cx + Math.cos(a)*r;
     const sy = cy + Math.sin(a)*r;
 
-    // Spawns garantis
-    spawnTimer -= dt; ringTimer -= dt;
-    if (spawnTimer <= 0){
-      spawnMeteor();
-      // cadence : 0.8 s, puis accélère jusqu’à 0.35 s min
-      const next = 0.8 - Math.min(0.45, score*0.0015);
-      spawnTimer = Math.max(0.35, next);
-    }
-    if (ringTimer <= 0){
-      spawnRing();
-      ringTimer = 2.0 - Math.min(0.8, score*0.001); // anneaux un peu plus fréquents avec le score
+    // Spawns
+    ringTimer  -= dt;
+    spikeTimer -= dt;
+    if (ringTimer<=0)  { spawnRing();  ringTimer  = 2.0 - Math.min(0.8, score*0.001); }
+    if (spikeTimer<=0) { spawnSpike(); spikeTimer = 0.9 - Math.min(0.45, score*0.0015); } // jusqu’à ~0.45s
+
+    // Update spikes (pics)
+    for(let i=spikes.length-1;i>=0;i--){
+      const s = spikes[i];
+      s.t += dt; s.life -= dt; s.phase += dt*6;
+      // collision si on est sur la même orbite ET angle dans l’arc
+      const sameOrbit = Math.abs(s.R - r) < 10; // marge (le joueur suit l’orbite)
+      if (sameOrbit && angDist(a, s.ang) < s.arc/2){
+        return gameOver();
+      }
+      if (s.life<=0) spikes.splice(i,1);
     }
 
-    // Déplacements + collisions
-    for (let i=meteors.length-1;i>=0;i--){
-      const m = meteors[i];
-      m.x += m.vx*dt; m.y += m.vy*dt; m.life -= dt;
-      if (Math.hypot(m.x - sx, m.y - sy) < m.rad + 6) return gameOver();
-      if (m.life<=0 || m.x<-50 || m.x>W+50 || m.y<-50 || m.y>H+50) meteors.splice(i,1);
-    }
-
-    for (let i=rings.length-1;i>=0;i--){
+    // Update/collect rings
+    for(let i=rings.length-1;i>=0;i--){
       const g = rings[i];
       const gx = cx + Math.cos(g.ang)*g.R;
       const gy = cy + Math.sin(g.ang)*g.R;
       g.blink += dt;
-      if (Math.hypot(gx-sx, gy-sy) < 12){
+      if (Math.hypot(gx - sx, gy - sy) < 12){
         rings.splice(i,1);
-        ringsCount++; if (uiRings) uiRings.textContent = ringsCount;
         score += 25; uiScore.textContent = Math.floor(score);
       }
       if (g.blink>6) rings.splice(i,1);
@@ -154,9 +154,22 @@
     // Rendu
     drawSpace();
 
-    // Anneaux visuels
+    // Pics (arcs rouges pulsants)
+    for(const s of spikes){
+      const pulse = 0.6 + 0.4*Math.abs(Math.sin(s.phase));
+      X.save();
+      X.strokeStyle = getCSS('--meteor'); // rouge
+      X.globalAlpha = 0.85;
+      X.lineWidth   = 6 * pulse;         // pulsation d’épaisseur
+      X.beginPath();
+      X.arc(cx, cy, s.R, s.ang - s.arc/2, s.ang + s.arc/2);
+      X.stroke();
+      X.restore();
+    }
+
+    // Anneaux (collectibles)
     X.save();
-    for (const g of rings){
+    for(const g of rings){
       const alpha = 0.6 + 0.4*Math.sin(g.blink*6);
       X.strokeStyle = getCSS('--ring'); X.globalAlpha = alpha; circle(cx,cy,g.R);
       const gx = cx + Math.cos(g.ang)*g.R;
@@ -165,18 +178,10 @@
     }
     X.restore();
 
-    // Météores (halo)
-    X.save();
-    for (const m of meteors){
-      X.shadowColor = 'rgba(255,90,90,.8)'; X.shadowBlur = 10;
-      X.fillStyle = getCSS('--meteor');
-      X.beginPath(); X.arc(m.x,m.y,m.rad,0,Math.PI*2); X.fill();
-    }
-    X.restore();
-
     // Satellite + traînée
     X.fillStyle = getCSS('--sat'); X.beginPath(); X.arc(sx,sy,6,0,Math.PI*2); X.fill();
-    X.globalAlpha=0.25; X.beginPath(); X.arc(cx,cy,r, a-0.8, a); X.strokeStyle=getCSS('--sat'); X.lineWidth=2; X.stroke(); X.globalAlpha=1;
+    X.globalAlpha=0.25; X.beginPath(); X.arc(cx,cy,r, a-0.8, a); X.strokeStyle=getCSS('--sat'); X.lineWidth=2; X.stroke();
+    X.globalAlpha=1;
 
     // Hint début
     if (tutorial > 0) {
@@ -186,7 +191,7 @@
       X.fillStyle = '#fff';
       X.font = 'bold 16px system-ui,Segoe UI,Roboto,Arial';
       X.textAlign = 'center';
-      X.fillText('Tape pour changer d’orbite', cx, H - 40);
+      X.fillText('Tape pour changer d’orbite (évite les pics rouges)', cx, H - 40);
       X.restore();
     }
 
