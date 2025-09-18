@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+
   const C = document.getElementById('game');
   const X = C.getContext('2d');
 
@@ -30,8 +31,8 @@
   const meteors = [];
   let spawnTimer = 0, ringTimer = 0;
 
-  // --- Sécurité : forcer l’état UI au démarrage
-  function forceInitialUI() {
+  // Force un état propre au chargement
+  function forceInitialUI(){
     start.hidden = false;
     over.hidden  = true;
     running = false;
@@ -41,7 +42,10 @@
     score = 0; uiScore.textContent = '0';
     a = -Math.PI/2; r = outerR; targetR = outerR;
     rings.length = 0; meteors.length = 0;
-    spawnTimer = 0; ringTimer = 0; last = performance.now(); dt = 0;
+    // IMPORTANT : pas de météore pendant 1s pour éviter toute collision instantanée
+    spawnTimer = 1.0; 
+    ringTimer  = 1.0;
+    last = performance.now(); dt = 0;
   }
 
   function tap(){
@@ -75,7 +79,8 @@
     X.fillStyle = getCSS('--planet');
     X.beginPath(); X.arc(cx,cy,60,0,Math.PI*2); X.fill();
     X.strokeStyle = getCSS('--ring'); X.lineWidth = 2.5; X.globalAlpha = 0.7;
-    circle(cx,cy,innerR); circle(cx,cy,outerR); X.globalAlpha = 1;
+    circle(cx,cy,innerR); circle(cx,cy,outerR);
+    X.globalAlpha = 1;
   }
   function circle(x,y,R){ X.beginPath(); X.arc(x,y,R,0,Math.PI*2); X.stroke(); }
   function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name); }
@@ -98,15 +103,15 @@
     if (spawnTimer<=0){ spawnMeteor(); spawnTimer = 0.6 + Math.max(0.15, 1.1 - score*0.01); }
     if (ringTimer<=0){ spawnRing();   ringTimer  = 2.2 + Math.max(0.00, 1.2 - score*0.01); }
 
-    // Meteors
+    // Météores
     for (let i=meteors.length-1;i>=0;i--){
       const m = meteors[i];
       m.x += m.vx*dt; m.y += m.vy*dt; m.life -= dt;
-      if (Math.hypot(m.x - sx, m.y - sy) < m.rad + 6){ gameOver(); return; }
+      if (Math.hypot(m.x - sx, m.y - sy) < m.rad + 6){ return gameOver(); }
       if (m.life<=0 || m.x<-50 || m.x>W+50 || m.y<-50 || m.y>H+50) meteors.splice(i,1);
     }
 
-    // Rings
+    // Anneaux
     for (let i=rings.length-1;i>=0;i--){
       const g = rings[i];
       const gx = cx + Math.cos(g.ang)*g.R;
@@ -121,7 +126,8 @@
 
     // Rendu
     drawSpace();
-    // Rings
+
+    // Anneaux
     X.save();
     for (const g of rings){
       const alpha = 0.6 + 0.4*Math.sin(g.blink*6);
@@ -131,11 +137,16 @@
       X.globalAlpha = 1; X.beginPath(); X.arc(gx,gy,6,0,Math.PI*2); X.fillStyle = getCSS('--ring'); X.fill();
     }
     X.restore();
-    // Meteors
-    for (const m of meteors){ X.fillStyle = getCSS('--meteor'); X.beginPath(); X.arc(m.x,m.y,m.rad,0,Math.PI*2); X.fill(); }
+
+    // Météores
+    for (const m of meteors){
+      X.fillStyle = getCSS('--meteor'); X.beginPath(); X.arc(m.x,m.y,m.rad,0,Math.PI*2); X.fill();
+    }
+
     // Satellite + traînée
     X.fillStyle = getCSS('--sat'); X.beginPath(); X.arc(sx,sy,6,0,Math.PI*2); X.fill();
-    X.globalAlpha=0.25; X.beginPath(); X.arc(cx,cy,r, a-0.8, a); X.strokeStyle=getCSS('--sat'); X.lineWidth=2; X.stroke(); X.globalAlpha=1;
+    X.globalAlpha=0.25; X.beginPath(); X.arc(cx,cy,r, a-0.8, a); X.strokeStyle=getCSS('--sat'); X.lineWidth=2; X.stroke();
+    X.globalAlpha=1;
 
     requestAnimationFrame(update);
   }
@@ -156,7 +167,7 @@
     over.hidden = false;
   }
 
-  // Boutons corrects
+  // Boutons (IDs corrects)
   btnPlay.addEventListener('click', startGame);
   btnRetry.addEventListener('click', startGame);
   btnShare.addEventListener('click', () => {
@@ -167,9 +178,9 @@
     window.open(u.toString(), '_blank');
   });
 
-  // Forcer l’état initial au chargement
+  // Initialisation
   window.addEventListener('DOMContentLoaded', () => {
     forceInitialUI();
-    drawSpace(); // fond visible avant de jouer
+    drawSpace();
   });
 })();
